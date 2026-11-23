@@ -4,7 +4,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.lostmineinteractive.keylight-mk2-bridge</string>
+    <string>com.lostmineinteractive.keylight-mk2</string>
     <key>ProgramArguments</key>
     <array>
         <string>{{PYTHON}}</string>

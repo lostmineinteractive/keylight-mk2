@@ -43,7 +43,7 @@ treat the default as a starting point rather than a guarantee.
 If the light does not react, find out what *your* macOS logs:
 
 ```sh
-"$HOME/Library/Application Support/keylight-mk2-bridge/bin/camera-watcher.sh" calibrate
+"$HOME/Library/Application Support/keylight-mk2/bin/camera-watcher.sh" calibrate
 ```
 
 It records the candidate log lines while you turn the camera on and then off,
@@ -76,7 +76,7 @@ Re-run without `--swift` to go back to the log watcher.
 
 ## Settings
 
-`~/Library/Application Support/keylight-mk2-bridge/camera-watcher.conf`, changed
+`~/Library/Application Support/keylight-mk2/camera-watcher.conf`, changed
 with `camera-watcher.sh set KEY VALUE` (then restart the watcher):
 
 | Key | Default | Meaning |

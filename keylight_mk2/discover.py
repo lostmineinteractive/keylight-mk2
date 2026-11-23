@@ -1,4 +1,4 @@
-"""Find Elgato lights on the LAN via mDNS (`python -m bridge.discover`)."""
+"""Find Elgato lights on the LAN via mDNS (`python -m keylight_mk2.discover`)."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def is_mk2(device: Dict[str, Any]) -> bool:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="bridge.discover", description=__doc__)
+    parser = argparse.ArgumentParser(prog="keylight_mk2.discover", description=__doc__)
     parser.add_argument("--timeout", type=float, default=4.0, help="seconds to listen (default 4)")
     parser.add_argument("--all", action="store_true", help="include lights without the TLS marker")
     parser.add_argument("--json", action="store_true")

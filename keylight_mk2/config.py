@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-APP_NAME = "keylight-mk2-bridge"
+APP_NAME = "keylight-mk2"
 DEFAULT_BIND = "127.0.0.1"
 DEFAULT_PORT = 9124
 CERT_FILES = ("client-chain.pem", "client.key", "root.crt.pem")
@@ -19,7 +19,7 @@ class ConfigError(Exception):
 
 
 def default_home() -> Path:
-    override = os.environ.get("KEYLIGHT_MK2_BRIDGE_HOME")
+    override = os.environ.get("KEYLIGHT_MK2_HOME")
     if override:
         return Path(override)
     return Path.home() / "Library" / "Application Support" / APP_NAME
