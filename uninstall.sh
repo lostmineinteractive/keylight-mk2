@@ -1,5 +1,5 @@
 #!/bin/bash
-# Uninstaller for keylight-mk2-bridge.
+# Uninstaller for keylight-mk2.
 #
 # Stops and removes the LaunchAgents and the installed files. The minted
 # certificates are kept (so a reinstall does not need Control Center) unless
@@ -7,10 +7,10 @@
 
 set -euo pipefail
 
-APP_DIR="$HOME/Library/Application Support/keylight-mk2-bridge"
+APP_DIR="$HOME/Library/Application Support/keylight-mk2"
 AGENTS="$HOME/Library/LaunchAgents"
-LABELS=("com.lostmineinteractive.keylight-mk2-bridge" "com.lostmineinteractive.keylight-mk2-camera")
-LOGS=("$HOME/Library/Logs/keylight-mk2-bridge.log" "$HOME/Library/Logs/keylight-mk2-camera.log")
+LABELS=("com.lostmineinteractive.keylight-mk2" "com.lostmineinteractive.keylight-mk2-camera")
+LOGS=("$HOME/Library/Logs/keylight-mk2.log" "$HOME/Library/Logs/keylight-mk2-camera.log")
 PURGE=0
 
 for arg in "$@"; do
@@ -45,7 +45,7 @@ if [ "$PURGE" = 1 ]; then
     rm -f "${LOGS[@]}"
     echo "Removed $APP_DIR (including the minted certificates) and the logs"
 elif [ -d "$APP_DIR" ]; then
-    for item in venv bridge bin config.json state.json camera-watcher.conf; do
+    for item in venv keylight_mk2 bin config.json state.json camera-watcher.conf; do
         rm -rf "${APP_DIR:?}/$item"
     done
     echo "Removed the daemon, virtualenv and config from $APP_DIR"

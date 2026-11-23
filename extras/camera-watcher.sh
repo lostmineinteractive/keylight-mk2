@@ -1,5 +1,5 @@
 #!/bin/bash
-# Camera auto-trigger for keylight-mk2-bridge (optional, and the most fragile part).
+# Camera auto-trigger for keylight-mk2 (optional, and the most fragile part).
 #
 # Watches for the camera turning on or off and tells the bridge: camera on ->
 # light on with the call preset, camera off -> light off.
@@ -14,7 +14,7 @@
 
 set -u
 
-APP_DIR="${KEYLIGHT_MK2_BRIDGE_HOME:-$HOME/Library/Application Support/keylight-mk2-bridge}"
+APP_DIR="${KEYLIGHT_MK2_HOME:-$HOME/Library/Application Support/keylight-mk2}"
 CONF="$APP_DIR/camera-watcher.conf"
 LOG=/usr/bin/log
 

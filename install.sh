@@ -1,19 +1,19 @@
 #!/bin/bash
-# Installer for keylight-mk2-bridge. Idempotent: safe to re-run.
+# Installer for keylight-mk2. Idempotent: safe to re-run.
 #
 # Mints a client certificate from the PKI inside Elgato Control Center, installs
-# the daemon into ~/Library/Application Support/keylight-mk2-bridge, discovers the
+# the daemon into ~/Library/Application Support/keylight-mk2, discovers the
 # light, starts the daemon under launchd, and cycles the light as a smoke test.
 
 set -euo pipefail
 
-LABEL="com.lostmineinteractive.keylight-mk2-bridge"
-APP_DIR="$HOME/Library/Application Support/keylight-mk2-bridge"
+LABEL="com.lostmineinteractive.keylight-mk2"
+APP_DIR="$HOME/Library/Application Support/keylight-mk2"
 CERTS="$APP_DIR/certs"
 VENV="$APP_DIR/venv"
 CONFIG="$APP_DIR/config.json"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG_FILE="$HOME/Library/Logs/keylight-mk2-bridge.log"
+LOG_FILE="$HOME/Library/Logs/keylight-mk2.log"
 PKI_NAME="pki_Key_Light_Air_Mk2"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -74,7 +74,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/keylight-mk2-bridge.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/keylight-mk2.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 confirm() {
@@ -340,16 +340,16 @@ else
         die "pip install failed (see above). Check the internet connection, or re-run with
        --python <path> pointing at another Python 3."
 fi
-rm -rf "$APP_DIR/bridge"
-mkdir -p "$APP_DIR/bridge" "$APP_DIR/bin"
-cp "$REPO"/bridge/*.py "$APP_DIR/bridge/"
+rm -rf "$APP_DIR/keylight_mk2"
+mkdir -p "$APP_DIR/keylight_mk2" "$APP_DIR/bin"
+cp "$REPO"/keylight_mk2/*.py "$APP_DIR/keylight_mk2/"
 install -m 755 "$REPO/cli/keylight-mk2" "$APP_DIR/bin/keylight-mk2"
 info "Installed the daemon and the 'keylight-mk2' CLI."
 
 # ------------------------------------------------------------- 6. config.json
 
 step "Configuring lights"
-configure=("$VENV/bin/python" -u -m bridge.configure --config "$CONFIG" --certs "$CERTS")
+configure=("$VENV/bin/python" -u -m keylight_mk2.configure --config "$CONFIG" --certs "$CERTS")
 for host in ${HOSTS[@]+"${HOSTS[@]}"}; do configure+=(--host "$host"); done
 [ -n "$PORT_ARG" ] && configure+=(--port "$PORT_ARG")
 [ "$REDISCOVER" = 1 ] && configure+=(--rediscover)
@@ -383,7 +383,7 @@ render() {
     printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/[\\&|]/\\&/g'
 }
 sed -e "s|{{PYTHON}}|$(render "$VENV/bin/python")|g" \
-    -e "s|{{ENTRYPOINT}}|$(render "$APP_DIR/bridge/__main__.py")|g" \
+    -e "s|{{ENTRYPOINT}}|$(render "$APP_DIR/keylight_mk2/__main__.py")|g" \
     -e "s|{{CONFIG}}|$(render "$CONFIG")|g" \
     -e "s|{{APP_DIR}}|$(render "$APP_DIR")|g" \
     -e "s|{{LOG}}|$(render "$LOG_FILE")|g" \

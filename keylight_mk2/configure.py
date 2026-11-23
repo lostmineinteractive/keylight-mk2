@@ -1,4 +1,4 @@
-"""Write config.json for the installer (`python -m bridge.configure`).
+"""Write config.json for the installer (`python -m keylight_mk2.configure`).
 
 Discovers MK.2 lights over mDNS (or takes --host), asks each one for its
 serial number, and writes the config. Settings and light names already in the
@@ -61,7 +61,7 @@ def _write(path: Path, config: Dict[str, Any]) -> None:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="bridge.configure", description=__doc__)
+    parser = argparse.ArgumentParser(prog="keylight_mk2.configure", description=__doc__)
     parser.add_argument("--config", type=Path, default=default_home() / "config.json")
     parser.add_argument("--certs", type=Path, help="default: certs/ next to the config file")
     parser.add_argument("--host", action="append", default=[], help="skip discovery (repeatable)")

@@ -10,7 +10,7 @@
 set -euo pipefail
 
 LABEL="com.lostmineinteractive.keylight-mk2-camera"
-APP_DIR="$HOME/Library/Application Support/keylight-mk2-bridge"
+APP_DIR="$HOME/Library/Application Support/keylight-mk2"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_FILE="$HOME/Library/Logs/keylight-mk2-camera.log"
 WATCHER="$APP_DIR/bin/camera-watcher.sh"

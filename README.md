@@ -1,4 +1,4 @@
-# keylight-mk2-bridge
+# keylight-mk2
 
 Local control for the **Elgato Key Light Air MK.2** (and other MK.2-generation
 lights) from macOS: Shortcuts, shell scripts, `curl`, anything that can make an
@@ -49,10 +49,10 @@ The installer is idempotent; re-run it any time. It:
 1. Finds the `pki_Key_Light_Air_Mk2` directory inside Control Center, wherever
    the app lives and whatever it is named.
 2. Mints a client certificate signed by Elgato's intermediate CA into
-   `~/Library/Application Support/keylight-mk2-bridge/certs/` (mode 600).
+   `~/Library/Application Support/keylight-mk2/certs/` (mode 600).
 3. Creates a virtualenv there and installs `websockets`, `aiohttp`, `zeroconf`.
 4. Discovers MK.2 lights over mDNS and writes `config.json`.
-5. Installs a LaunchAgent (`com.lostmineinteractive.keylight-mk2-bridge`) so the daemon runs at
+5. Installs a LaunchAgent (`com.lostmineinteractive.keylight-mk2`) so the daemon runs at
    login and restarts if it exits.
 6. Runs a smoke test that cycles the light on, off, on, and prints PASS or FAIL.
 
@@ -168,7 +168,7 @@ Behaviour worth knowing:
 ## Command line
 
 `keylight-mk2` is a thin wrapper over the API, installed to
-`~/Library/Application Support/keylight-mk2-bridge/bin/keylight-mk2`:
+`~/Library/Application Support/keylight-mk2/bin/keylight-mk2`:
 
 ```sh
 keylight-mk2 status
@@ -182,7 +182,7 @@ keylight-mk2 -l key off        # one light, by name or serial
 To put it on your `PATH`:
 
 ```sh
-ln -s "$HOME/Library/Application Support/keylight-mk2-bridge/bin/keylight-mk2" /usr/local/bin/keylight-mk2
+ln -s "$HOME/Library/Application Support/keylight-mk2/bin/keylight-mk2" /usr/local/bin/keylight-mk2
 ```
 
 ## Shortcuts and automation
@@ -194,7 +194,7 @@ ln -s "$HOME/Library/Application Support/keylight-mk2-bridge/bin/keylight-mk2" /
 
 ## Configuration
 
-`~/Library/Application Support/keylight-mk2-bridge/config.json`:
+`~/Library/Application Support/keylight-mk2/config.json`:
 
 ```json
 {
@@ -218,12 +218,12 @@ the daemon also remembers the last IP that worked and falls back to it when the
 name does not resolve. After editing the config, restart the daemon:
 
 ```sh
-launchctl kickstart -k gui/$(id -u)/com.lostmineinteractive.keylight-mk2-bridge
+launchctl kickstart -k gui/$(id -u)/com.lostmineinteractive.keylight-mk2
 ```
 
 ## Troubleshooting
 
-The daemon logs to `~/Library/Logs/keylight-mk2-bridge.log`.
+The daemon logs to `~/Library/Logs/keylight-mk2.log`.
 
 **`/status` shows `"reachable": false`.** The `error` field says why.
 - *cannot resolve ...* / *timed out* / *Connect call failed*: the light is off,
@@ -254,8 +254,8 @@ rebuilds the virtualenv when needed and keeps your certificates and config.
 **See what the daemon is doing:**
 
 ```sh
-tail -f ~/Library/Logs/keylight-mk2-bridge.log
-launchctl print gui/$(id -u)/com.lostmineinteractive.keylight-mk2-bridge | head -20
+tail -f ~/Library/Logs/keylight-mk2.log
+launchctl print gui/$(id -u)/com.lostmineinteractive.keylight-mk2 | head -20
 ```
 
 ## How it works
@@ -312,13 +312,13 @@ disconnected triggers an immediate reconnect attempt.
 ## Development
 
 ```sh
-VENV="$HOME/Library/Application Support/keylight-mk2-bridge/venv"
+VENV="$HOME/Library/Application Support/keylight-mk2/venv"
 "$VENV/bin/python" -m unittest discover -s tests -t .   # tests run against a fake light
-"$VENV/bin/python" -m bridge --config /path/to/config.json -v   # run in the foreground
-"$VENV/bin/python" -m bridge.discover                   # list MK.2 lights on the network
+"$VENV/bin/python" -m keylight_mk2 --config /path/to/config.json -v   # run in the foreground
+"$VENV/bin/python" -m keylight_mk2.discover                   # list MK.2 lights on the network
 ```
 
-Layout: `bridge/` is the daemon (`light.py` holds the WebSocket and protocol,
+Layout: `keylight_mk2/` is the daemon (`light.py` holds the WebSocket and protocol,
 `api.py` the HTTP routes), `cli/keylight-mk2` the command-line wrapper,
 `launchd/` the LaunchAgent template, `extras/` the camera trigger, `tests/`
 the test suite and its fake light.

@@ -2,7 +2,7 @@
 
 Run with the bridge's virtualenv (it has websockets and aiohttp):
 
-    "$HOME/Library/Application Support/keylight-mk2-bridge/venv/bin/python" -m unittest discover tests
+    "$HOME/Library/Application Support/keylight-mk2/venv/bin/python" -m unittest discover tests
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from bridge.api import Api  # noqa: E402
-from bridge.convert import kelvin_to_mired, mired_to_kelvin  # noqa: E402
-from bridge.light import Light, LightRangeError, LightRPCError  # noqa: E402
+from keylight_mk2.api import Api  # noqa: E402
+from keylight_mk2.convert import kelvin_to_mired, mired_to_kelvin  # noqa: E402
+from keylight_mk2.light import Light, LightRangeError, LightRPCError  # noqa: E402
 from tests.fake_light import FakeLight, make_pki  # noqa: E402
 
 

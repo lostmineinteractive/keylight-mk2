@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""keylight-mk2: command-line control for the keylight-mk2-bridge daemon.
+"""keylight-mk2: command-line control for the keylight-mk2 daemon.
 
 A thin wrapper over the local HTTP API (standard library only).
 
@@ -11,7 +11,7 @@ A thin wrapper over the local HTTP API (standard library only).
   keylight-mk2 -l key off                  address one light by name or serial
 
 Reads the port (and optional secret) from the bridge's config.json; override
-with KEYLIGHT_BRIDGE_URL / KEYLIGHT_BRIDGE_SECRET.
+with KEYLIGHT_MK2_URL / KEYLIGHT_MK2_SECRET.
 """
 
 import argparse
@@ -24,8 +24,8 @@ import urllib.request
 from pathlib import Path
 
 CONFIG = Path(
-    os.environ.get("KEYLIGHT_MK2_BRIDGE_HOME")
-    or Path.home() / "Library" / "Application Support" / "keylight-mk2-bridge"
+    os.environ.get("KEYLIGHT_MK2_HOME")
+    or Path.home() / "Library" / "Application Support" / "keylight-mk2"
 ) / "config.json"
 
 
@@ -38,8 +38,8 @@ def endpoint():
     bind = config.get("bind") or "127.0.0.1"
     if bind in ("0.0.0.0", "::"):
         bind = "127.0.0.1"
-    url = os.environ.get("KEYLIGHT_BRIDGE_URL") or f"http://{bind}:{config.get('port', 9124)}"
-    return url.rstrip("/"), os.environ.get("KEYLIGHT_BRIDGE_SECRET") or config.get("secret")
+    url = os.environ.get("KEYLIGHT_MK2_URL") or f"http://{bind}:{config.get('port', 9124)}"
+    return url.rstrip("/"), os.environ.get("KEYLIGHT_MK2_SECRET") or config.get("secret")
 
 
 def request(method, path, body=None):
