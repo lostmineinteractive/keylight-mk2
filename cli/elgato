@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""elgato: command-line control for the elgato-mk2-bridge daemon.
+
+A thin wrapper over the local HTTP API (standard library only).
+
+  elgato status                      show every light
+  elgato on | off | toggle           switch the light(s)
+  elgato set -b 40 -k 4500           brightness 40%, 4500K (add --on / --off)
+  elgato brightness 40               shorthand for: set -b 40
+  elgato kelvin 4500                 shorthand for: set -k 4500
+  elgato -l key off                  address one light by name or serial
+
+Reads the port (and optional secret) from the bridge's config.json; override
+with ELGATO_BRIDGE_URL / ELGATO_BRIDGE_SECRET.
+"""
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+CONFIG = Path(
+    os.environ.get("ELGATO_MK2_BRIDGE_HOME")
+    or Path.home() / "Library" / "Application Support" / "elgato-mk2-bridge"
+) / "config.json"
+
+
+def endpoint():
+    """(base URL, secret) from the environment, falling back to config.json."""
+    try:
+        config = json.loads(CONFIG.read_text())
+    except (OSError, ValueError):
+        config = {}
+    bind = config.get("bind") or "127.0.0.1"
+    if bind in ("0.0.0.0", "::"):
+        bind = "127.0.0.1"
+    url = os.environ.get("ELGATO_BRIDGE_URL") or f"http://{bind}:{config.get('port', 9124)}"
+    return url.rstrip("/"), os.environ.get("ELGATO_BRIDGE_SECRET") or config.get("secret")
+
+
+def request(method, path, body=None):
+    """Call the API. Returns (HTTP status, decoded JSON body)."""
+    base, secret = endpoint()
+    req = urllib.request.Request(base + path, method=method)
+    if secret:
+        req.add_header("X-Bridge-Secret", secret)
+    if body is not None:
+        req.data = json.dumps(body).encode()
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            return response.status, json.load(response)
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.load(exc)
+        except ValueError:
+            return exc.code, {"ok": False, "error": f"HTTP {exc.code} {exc.reason}"}
+    except (urllib.error.URLError, OSError) as exc:
+        reason = getattr(exc, "reason", exc)
+        sys.exit(f"elgato: cannot reach the bridge at {base} ({reason}). Is the daemon running?")
+
+
+def describe(light):
+    if light.get("on") is None:
+        state = "unknown"
+    else:
+        state = (
+            f"{'on ' if light['on'] else 'off'}  {light['brightness']:>3}%  "
+            f"{light['kelvin']}K ({light['temperature']} mired)"
+        )
+    line = f"{light.get('name', 'light')}: {state}"
+    if not light.get("reachable"):
+        line += f"  [unreachable: {light.get('error', 'no connection')}]"
+    return line
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="elgato", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("-l", "--light", help="name or serial of one light (default: all)")
+    parser.add_argument("--json", action="store_true", help="print the raw API response")
+    commands = parser.add_subparsers(dest="command", metavar="command")
+    for name in ("status", "on", "off", "toggle"):
+        commands.add_parser(name)
+    set_parser = commands.add_parser("set")
+    power = set_parser.add_mutually_exclusive_group()
+    power.add_argument("--on", dest="on", action="store_const", const=1)
+    power.add_argument("--off", dest="on", action="store_const", const=0)
+    set_parser.add_argument("-b", "--brightness", type=float, metavar="0-100")
+    color = set_parser.add_mutually_exclusive_group()
+    color.add_argument("-k", "--kelvin", type=float, metavar="2900-7000")
+    color.add_argument("-t", "--temperature", type=float, metavar="143-344", help="raw mired")
+    commands.add_parser("brightness").add_argument("brightness", type=float)
+    commands.add_parser("kelvin").add_argument("kelvin", type=float)
+    args = parser.parse_args()
+
+    command = args.command or "status"
+    prefix = f"/light/{urllib.parse.quote(args.light, safe='')}" if args.light else ""
+    if command == "status":
+        status, reply = request("GET", f"{prefix}/status")
+    elif command in ("on", "off", "toggle"):
+        status, reply = request("POST", f"{prefix}/{command}")
+    else:
+        fields = ("on", "brightness", "kelvin", "temperature")
+        body = {k: getattr(args, k) for k in fields if getattr(args, k, None) is not None}
+        if not body:
+            set_parser.error("nothing to set (use --on/--off, -b, -k or -t)")
+        status, reply = request("POST", f"{prefix}/set", body)
+
+    if args.json:
+        print(json.dumps(reply, indent=2))
+    else:
+        for light in reply.get("lights", [reply] if "name" in reply else []):
+            print(describe(light))
+        if not reply.get("ok"):
+            print(f"elgato: {reply.get('error', f'HTTP {status}')}", file=sys.stderr)
+    return 0 if reply.get("ok") else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
