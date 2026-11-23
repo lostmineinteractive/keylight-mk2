@@ -1,5 +1,5 @@
 #!/bin/bash
-# Uninstaller for elgato-mk2-bridge.
+# Uninstaller for keylight-mk2-bridge.
 #
 # Stops and removes the LaunchAgents and the installed files. The minted
 # certificates are kept (so a reinstall does not need Control Center) unless
@@ -7,10 +7,10 @@
 
 set -euo pipefail
 
-APP_DIR="$HOME/Library/Application Support/elgato-mk2-bridge"
+APP_DIR="$HOME/Library/Application Support/keylight-mk2-bridge"
 AGENTS="$HOME/Library/LaunchAgents"
-LABELS=("com.user.elgato-mk2-bridge" "com.user.elgato-mk2-camera")
-LOGS=("$HOME/Library/Logs/elgato-mk2-bridge.log" "$HOME/Library/Logs/elgato-mk2-camera.log")
+LABELS=("com.lostmineinteractive.keylight-mk2-bridge" "com.lostmineinteractive.keylight-mk2-camera")
+LOGS=("$HOME/Library/Logs/keylight-mk2-bridge.log" "$HOME/Library/Logs/keylight-mk2-camera.log")
 PURGE=0
 
 for arg in "$@"; do

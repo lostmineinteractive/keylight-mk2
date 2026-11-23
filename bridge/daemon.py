@@ -37,7 +37,7 @@ async def run(cfg: Config) -> None:
     runner = web.AppRunner(Api(lights, cfg.secret).app(), access_log=None)
     await runner.setup()
     await web.TCPSite(runner, cfg.bind, cfg.port).start()
-    log.info("elgato-mk2-bridge %s listening on http://%s:%d", __version__, cfg.bind, cfg.port)
+    log.info("keylight-mk2-bridge %s listening on http://%s:%d", __version__, cfg.bind, cfg.port)
     if not _is_loopback(cfg.bind) and not cfg.secret:
         log.warning(
             'bound to %s with no "secret" in the config: anyone on this network can '
@@ -61,7 +61,7 @@ async def run(cfg: Config) -> None:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="elgato-mk2-bridge", description=__doc__)
+    parser = argparse.ArgumentParser(prog="keylight-mk2-bridge", description=__doc__)
     parser.add_argument("--config", type=Path, default=default_home() / "config.json")
     parser.add_argument("--certs", type=Path, help="default: certs/ next to the config file")
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")

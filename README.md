@@ -1,4 +1,4 @@
-# elgato-mk2-bridge
+# keylight-mk2-bridge
 
 Local control for the **Elgato Key Light Air MK.2** (and other MK.2-generation
 lights) from macOS: Shortcuts, shell scripts, `curl`, anything that can make an
@@ -49,10 +49,10 @@ The installer is idempotent; re-run it any time. It:
 1. Finds the `pki_Key_Light_Air_Mk2` directory inside Control Center, wherever
    the app lives and whatever it is named.
 2. Mints a client certificate signed by Elgato's intermediate CA into
-   `~/Library/Application Support/elgato-mk2-bridge/certs/` (mode 600).
+   `~/Library/Application Support/keylight-mk2-bridge/certs/` (mode 600).
 3. Creates a virtualenv there and installs `websockets`, `aiohttp`, `zeroconf`.
 4. Discovers MK.2 lights over mDNS and writes `config.json`.
-5. Installs a LaunchAgent (`com.user.elgato-mk2-bridge`) so the daemon runs at
+5. Installs a LaunchAgent (`com.lostmineinteractive.keylight-mk2-bridge`) so the daemon runs at
    login and restarts if it exits.
 6. Runs a smoke test that cycles the light on, off, on, and prints PASS or FAIL.
 
@@ -167,22 +167,22 @@ Behaviour worth knowing:
 
 ## Command line
 
-`elgato` is a thin wrapper over the API, installed to
-`~/Library/Application Support/elgato-mk2-bridge/bin/elgato`:
+`keylight-mk2` is a thin wrapper over the API, installed to
+`~/Library/Application Support/keylight-mk2-bridge/bin/keylight-mk2`:
 
 ```sh
-elgato status
-elgato on | off | toggle
-elgato set -b 40 -k 4500 --on
-elgato brightness 60
-elgato kelvin 3200
-elgato -l key off        # one light, by name or serial
+keylight-mk2 status
+keylight-mk2 on | off | toggle
+keylight-mk2 set -b 40 -k 4500 --on
+keylight-mk2 brightness 60
+keylight-mk2 kelvin 3200
+keylight-mk2 -l key off        # one light, by name or serial
 ```
 
 To put it on your `PATH`:
 
 ```sh
-ln -s "$HOME/Library/Application Support/elgato-mk2-bridge/bin/elgato" /usr/local/bin/elgato
+ln -s "$HOME/Library/Application Support/keylight-mk2-bridge/bin/keylight-mk2" /usr/local/bin/keylight-mk2
 ```
 
 ## Shortcuts and automation
@@ -194,7 +194,7 @@ ln -s "$HOME/Library/Application Support/elgato-mk2-bridge/bin/elgato" /usr/loca
 
 ## Configuration
 
-`~/Library/Application Support/elgato-mk2-bridge/config.json`:
+`~/Library/Application Support/keylight-mk2-bridge/config.json`:
 
 ```json
 {
@@ -218,12 +218,12 @@ the daemon also remembers the last IP that worked and falls back to it when the
 name does not resolve. After editing the config, restart the daemon:
 
 ```sh
-launchctl kickstart -k gui/$(id -u)/com.user.elgato-mk2-bridge
+launchctl kickstart -k gui/$(id -u)/com.lostmineinteractive.keylight-mk2-bridge
 ```
 
 ## Troubleshooting
 
-The daemon logs to `~/Library/Logs/elgato-mk2-bridge.log`.
+The daemon logs to `~/Library/Logs/keylight-mk2-bridge.log`.
 
 **`/status` shows `"reachable": false`.** The `error` field says why.
 - *cannot resolve ...* / *timed out* / *Connect call failed*: the light is off,
@@ -254,15 +254,16 @@ rebuilds the virtualenv when needed and keeps your certificates and config.
 **See what the daemon is doing:**
 
 ```sh
-tail -f ~/Library/Logs/elgato-mk2-bridge.log
-launchctl print gui/$(id -u)/com.user.elgato-mk2-bridge | head -20
+tail -f ~/Library/Logs/keylight-mk2-bridge.log
+launchctl print gui/$(id -u)/com.lostmineinteractive.keylight-mk2-bridge | head -20
 ```
 
 ## How it works
 
 The MK.2 protocol is undocumented; the facts below were established against
 real hardware (firmware 1.1.11) and match the independent
-[ha-elgato-mk2](https://github.com/chrisbues/ha-elgato-mk2) integration.
+[ha-elgato-mk2](https://github.com/McMoobud/ha-elgato-mk2) integration (see
+[Acknowledgements](#acknowledgements)).
 
 - **Transport:** `wss://<host>:9123/` (the path must be `/`), TLS 1.2 only, with
   a client certificate. The light's server certificate chains to the *Elgato
@@ -311,16 +312,24 @@ disconnected triggers an immediate reconnect attempt.
 ## Development
 
 ```sh
-VENV="$HOME/Library/Application Support/elgato-mk2-bridge/venv"
+VENV="$HOME/Library/Application Support/keylight-mk2-bridge/venv"
 "$VENV/bin/python" -m unittest discover -s tests -t .   # tests run against a fake light
 "$VENV/bin/python" -m bridge --config /path/to/config.json -v   # run in the foreground
 "$VENV/bin/python" -m bridge.discover                   # list MK.2 lights on the network
 ```
 
 Layout: `bridge/` is the daemon (`light.py` holds the WebSocket and protocol,
-`api.py` the HTTP routes), `cli/elgato` the command-line wrapper, `launchd/` the
-LaunchAgent template, `extras/` the camera trigger, `tests/` the test suite and
-its fake light.
+`api.py` the HTTP routes), `cli/keylight-mk2` the command-line wrapper,
+`launchd/` the LaunchAgent template, `extras/` the camera trigger, `tests/`
+the test suite and its fake light.
+
+## Acknowledgements
+
+[ha-elgato-mk2](https://github.com/McMoobud/ha-elgato-mk2) by McMoobud, a Home
+Assistant integration, published the first public teardown of the MK.2
+protocol that we know of (JSON-RPC 2.0 over a mutual-TLS WebSocket on port
+9123). This project is an independent implementation and shares no code with
+it, but its findings were a useful reference and agree with what we measured.
 
 ## License
 
