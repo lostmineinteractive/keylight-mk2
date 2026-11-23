@@ -59,7 +59,7 @@ if [ "$PURGE" = 1 ]; then
     rm -f "${LOGS[@]}"
     echo "Removed $APP_DIR (including the minted certificates) and the logs"
 elif [ -d "$APP_DIR" ]; then
-    for item in venv keylight_mk2 bin config.json state.json camera-watcher.conf; do
+    for item in venv keylight_mk2 bin config.json state.json camera-watcher.conf install.json; do
         rm -rf "${APP_DIR:?}/$item"
     done
     echo "Removed the daemon, virtualenv and config from $APP_DIR"

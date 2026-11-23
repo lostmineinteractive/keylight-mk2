@@ -461,6 +461,17 @@ link_cli() {
 }
 link_cli
 
+# Where this install came from, for `keylight-mk2 update`: the checkout to pull,
+# the commit installed, and the choices to repeat.
+"$VENV/bin/python" -c '
+import json, sys
+repo, python, pypi, commit, path = sys.argv[1:]
+with open(path, "w") as handle:
+    json.dump({"repo": repo, "python": python, "pypi": pypi == "1", "commit": commit}, handle, indent=2)
+    handle.write("\n")
+' "$REPO" "$PYTHON_ARG" "$PYPI" "$(git -C "$REPO" rev-parse HEAD 2>/dev/null || true)" \
+    "$APP_DIR/install.json" || warn "could not write $APP_DIR/install.json; 'keylight-mk2 update' will not work"
+
 # ------------------------------------------------------------- 6. config.json
 
 # bootout returns before the job is fully gone, and bootstrap fails until it is.
@@ -734,6 +745,7 @@ Installed. The bridge is listening on $BASE_URL
   curl -s -X POST $BASE_URL/set -d '{"on":1,"brightness":40,"kelvin":4500}'
 
 Command line:  keylight-mk2 status    (also on | off | toggle | set; see README.md)
+Update:        keylight-mk2 update    (pulls this checkout and re-runs the installer)
 Shortcuts:     see shortcuts/README.md
 Camera auto on/off: see extras/README.md
 Full API reference and troubleshooting: README.md
