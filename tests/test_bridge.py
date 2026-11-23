@@ -8,15 +8,18 @@ Run with the bridge's virtualenv (it has websockets and aiohttp):
 from __future__ import annotations
 
 import asyncio
+import errno
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
+from keylight_mk2 import configure  # noqa: E402
 from keylight_mk2.api import Api  # noqa: E402
 from keylight_mk2.convert import kelvin_to_mired, mired_to_kelvin  # noqa: E402
 from keylight_mk2.light import Light, LightRangeError, LightRPCError  # noqa: E402
@@ -41,6 +44,35 @@ class ConvertTest(unittest.TestCase):
         self.assertEqual(mired_to_kelvin(222), 4500)
         self.assertEqual(mired_to_kelvin(200), 5000)
         self.assertEqual(mired_to_kelvin(344), 2900)
+
+
+class LocalNetworkBlockedTest(unittest.TestCase):
+    """macOS Local Network privacy shows up as EHOSTUNREACH on the mDNS send."""
+
+    def _blocked(self, error):
+        class FakeSocket:
+            def __init__(self, *args):
+                pass
+
+            def sendto(self, data, address):
+                self.address = address
+                if error is not None:
+                    raise OSError(error, "test")
+
+            def close(self):
+                pass
+
+        with unittest.mock.patch.object(configure.socket, "socket", FakeSocket):
+            return configure.local_network_blocked()
+
+    def test_send_succeeds(self):
+        self.assertFalse(self._blocked(None))
+
+    def test_no_route_to_host_means_blocked(self):
+        self.assertTrue(self._blocked(errno.EHOSTUNREACH))
+
+    def test_other_errors_are_not_a_block(self):
+        self.assertFalse(self._blocked(errno.ENETUNREACH))
 
 
 class BridgeTest(unittest.IsolatedAsyncioTestCase):

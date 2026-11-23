@@ -8,6 +8,8 @@
 set -euo pipefail
 
 LABEL="com.lostmineinteractive.keylight-mk2"
+SETUP_LABEL="$LABEL.setup"
+DOMAIN="gui/$(id -u)"
 APP_DIR="$HOME/Library/Application Support/keylight-mk2"
 CERTS="$APP_DIR/certs"
 VENV="$APP_DIR/venv"
@@ -394,18 +396,92 @@ info "Installed the daemon and the 'keylight-mk2' CLI."
 
 # ------------------------------------------------------------- 6. config.json
 
+# bootout returns before the job is fully gone, and bootstrap fails until it is.
+unload_job() {
+    launchctl bootout "$DOMAIN/$1" >/dev/null 2>&1 || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        launchctl print "$DOMAIN/$1" >/dev/null 2>&1 || break
+        sleep 0.5
+    done
+}
+
+# Run the configure command as a one-shot launchd job, so macOS credits its
+# network traffic to Python rather than to this terminal. Sets $status to its
+# exit code, or to "timeout"; its output goes to $WORK/setup.log.
+run_setup_job() {
+    local plist="$WORK/$SETUP_LABEL.plist" code=""
+    rm -f "$WORK/setup.log"
+    "$VENV/bin/python" -c '
+import plistlib, sys
+path, cwd, log, label = sys.argv[1:5]
+with open(path, "wb") as handle:
+    plistlib.dump({"Label": label, "ProgramArguments": sys.argv[5:], "WorkingDirectory": cwd,
+                   "StandardOutPath": log, "StandardErrorPath": log, "RunAtLoad": True}, handle)
+' "$plist" "$APP_DIR" "$WORK/setup.log" "$SETUP_LABEL" "${configure[@]}" ||
+        die "could not write $plist"
+    unload_job "$SETUP_LABEL"
+    launchctl bootstrap "$DOMAIN" "$plist" || die "launchctl could not load $plist"
+    for _ in $(seq 1 120); do
+        code="$(launchctl print "$DOMAIN/$SETUP_LABEL" 2>/dev/null |
+            sed -n 's/^[[:space:]]*last exit code = \([0-9][0-9]*\).*/\1/p' | head -n 1)"
+        [ -n "$code" ] && break
+        sleep 0.5
+    done
+    unload_job "$SETUP_LABEL"
+    status="${code:-timeout}"
+}
+
 step "Configuring lights"
 configure=("$VENV/bin/python" -u -m keylight_mk2.configure --config "$CONFIG" --certs "$CERTS")
 for host in ${HOSTS[@]+"${HOSTS[@]}"}; do configure+=(--host "$host"); done
 [ -n "$PORT_ARG" ] && configure+=(--port "$PORT_ARG")
 [ "$REDISCOVER" = 1 ] && configure+=(--rediscover)
 status=0
-(cd "$APP_DIR" && "${configure[@]}" | sed 's/^/    /') || status=$?
+(cd "$APP_DIR" && "${configure[@]}" 2>&1 | sed 's/^/    /') || status=$?
+
+# Exit 4: macOS Local Network privacy blocks this terminal app. macOS asks each
+# app once, and an app that was denied (or never answered) is not asked again,
+# so the terminal may be blocked with no prompt in sight. Run the step as the
+# daemon's Python under launchd instead; the daemon needs that permission anyway.
+if [ "$status" = 4 ]; then
+    info "This terminal app is not allowed on the local network, so running this"
+    info "step as the daemon's Python (via launchd) instead."
+    waited=0 told=0
+    while :; do
+        run_setup_job
+        [ "$status" = 4 ] || break
+        [ "$waited" -ge 300 ] && break
+        if [ "$told" = 0 ]; then
+            told=1
+            cat <<'EOF'
+    macOS is keeping Python off the local network too. Look for a prompt asking
+    to let "Python" find devices on your local network and click Allow. If there
+    is no prompt, switch Python on under System Settings > Privacy & Security >
+    Local Network; this opens that page:
+      open "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"
+    Waiting up to 5 minutes for that...
+EOF
+            if [ "$ADHOC" = 1 ]; then
+                info "(This Python is ad hoc signed, so macOS may refuse it even once allowed."
+                info " If so, re-run with --python /usr/bin/python3.)"
+            fi
+        fi
+        sleep 3
+        waited=$((waited + 3))
+    done
+    [ "$status" = 4 ] || sed 's/^/    /' "$WORK/setup.log"
+fi
+
 case "$status" in
     0) ;;
     3) die "No MK.2 light found on the network. Check that it is powered on and on the same
        network as this Mac, then re-run. To skip discovery, pass its hostname or IP:
        ./install.sh --host elgato-key-light-air-mk-2-xxxx.local" ;;
+    4) die "macOS has not allowed Python on the local network. Switch it on under System
+       Settings > Privacy & Security > Local Network (or switch on your terminal app
+       there instead), then re-run ./install.sh." ;;
+    timeout) die "the setup job did not finish within a minute; its output:
+$(cat "$WORK/setup.log" 2>/dev/null)" ;;
     *) die "could not write $CONFIG" ;;
 esac
 
@@ -436,13 +512,7 @@ sed -e "s|{{PYTHON}}|$(render "$VENV/bin/python")|g" \
     "$REPO/launchd/$LABEL.plist.template" >"$PLIST"
 plutil -lint "$PLIST" >/dev/null || die "rendered an invalid plist at $PLIST"
 
-DOMAIN="gui/$(id -u)"
-launchctl bootout "$DOMAIN/$LABEL" >/dev/null 2>&1 || true
-# bootout returns before the old job is fully gone; bootstrap fails until it is.
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-    launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 || break
-    sleep 0.5
-done
+unload_job "$LABEL"
 launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null ||
     { sleep 2 && launchctl bootstrap "$DOMAIN" "$PLIST"; } ||
     launchctl load -w "$PLIST" ||
