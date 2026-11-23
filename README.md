@@ -64,6 +64,7 @@ Options:
 | `--app <path>` / `--pki <dir>` | Where Control Center (or its PKI directory) is, if the search misses it. |
 | `--port <n>` | HTTP port (default 9124). |
 | `--python <path>` | Interpreter for the virtualenv (default: Apple's `/usr/bin/python3`, else `python3` on `PATH`). |
+| `--pypi` | Install the Python packages from public PyPI, ignoring pip config or `PIP_*` settings that point at another index. |
 | `--rediscover` | Replace the lights in an existing `config.json`. |
 | `--remint` | Mint a fresh certificate even if one exists. |
 | `--no-smoke-test` | Skip the light cycle. |
@@ -246,6 +247,14 @@ The daemon logs to `~/Library/Logs/keylight-mk2.log`.
 **Discovery finds nothing.** Pass the hostname or IP: `./install.sh --host
 192.168.1.50`. Lights without the `tls=CERT_1_VER_EN` mDNS marker use the old
 plain-HTTP API and are not supported by this project.
+
+**`pip install failed` with a 401 or 403.** pip is configured (in a
+`pip.conf` or a `PIP_INDEX_URL` variable) to use a private package index, as is
+common on company machines, and its credentials have expired. The installer
+prints the index it tried. Refresh the credentials (for AWS CodeArtifact,
+`aws codeartifact login --tool pip ...`) and re-run, or re-run with
+`./install.sh --pypi` to fetch the three packages from public PyPI instead.
+Check that your company allows that first.
 
 **The daemon stopped working after a macOS, Xcode or Python update.** The
 virtualenv is tied to the Python it was built from. Re-run `./install.sh`; it
