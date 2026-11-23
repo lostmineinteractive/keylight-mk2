@@ -22,6 +22,7 @@ APP_ARG=""
 PYTHON_ARG=""
 PORT_ARG=""
 HOSTS=()
+PYPI=0
 ASSUME_YES=0
 REMINT=0
 REDISCOVER=0
@@ -36,6 +37,8 @@ Usage: ./install.sh [options]
   --app <path>      Path to the Control Center app (any name, any location)
   --port <n>        HTTP port for the bridge (default 9124)
   --python <path>   Python 3.9+ for the virtualenv (default: Apple's /usr/bin/python3)
+  --pypi            Install the Python packages from public PyPI, ignoring any
+                    pip config or PIP_* settings that point at another index
   --rediscover      Replace the lights in an existing config.json
   --remint          Mint a fresh client certificate even if one exists
   --no-smoke-test   Skip the on/off/on cycle at the end
@@ -68,6 +71,7 @@ while [ $# -gt 0 ]; do
         --rediscover) REDISCOVER=1 && shift ;;
         --remint) REMINT=1 && shift ;;
         --no-smoke-test) SMOKE=0 && shift ;;
+        --pypi) PYPI=1 && shift ;;
         -y | --yes) ASSUME_YES=1 && shift ;;
         -h | --help) usage && exit 0 ;;
         *) usage >&2 && die "unknown option: $1" ;;
@@ -329,16 +333,58 @@ import os, sys
 import websockets.asyncio.client, aiohttp, zeroconf
 print(os.path.realpath(sys.base_prefix))' 2>/dev/null)" = "$PYTHON_BASE" ]
 }
+pip_install() {
+    if [ "$PYPI" = 1 ]; then
+        info "Installing from public PyPI (--pypi); ignoring pip config and PIP_* settings."
+        # PIP_CONFIG_FILE=/dev/null skips every pip.conf (global, user, venv);
+        # --isolated drops PIP_* environment variables.
+        PIP_CONFIG_FILE=/dev/null "$VENV/bin/python" -m pip install --isolated \
+            --quiet --disable-pip-version-check \
+            --index-url https://pypi.org/simple -r "$REPO/requirements.txt"
+    else
+        "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check \
+            -r "$REPO/requirements.txt"
+    fi
+}
+# After a failed install, say whether pip was pointed at a private index (a
+# company mirror such as AWS CodeArtifact or Artifactory), the usual cause on
+# managed machines. Credentials embedded in the URL are stripped before printing.
+pip_explain() {
+    [ "$PYPI" = 1 ] && {
+        info "Public PyPI could not be reached. Check the internet connection, or"
+        info "drop --pypi to use the package index pip is configured with."
+        return
+    }
+    local indexes
+    indexes="$( {
+        "$VENV/bin/python" -m pip config list 2>/dev/null |
+            sed -n "s/^[^=]*\.\(extra-\)\{0,1\}index-url='\(.*\)'\$/\2/p"
+        printf '%s\n' "${PIP_INDEX_URL:-}" "${PIP_EXTRA_INDEX_URL:-}" | tr ' ' '\n'
+    } | grep -v -e '^$' -e '^https://pypi\.org/simple/\{0,1\}$' |
+        sed -e 's#://[^/@]*@#://#' | sort -u)"
+    if [ -n "$indexes" ]; then
+        printf '\n' >&2
+        warn "pip is configured to use a package index other than public PyPI:"
+        printf '%s\n' "$indexes" | sed 's/^/        /' >&2
+        warn "A 401 or 403 from it usually means its credentials have expired (AWS"
+        warn "CodeArtifact tokens last 12 hours). Either refresh them, e.g. with"
+        warn "'aws codeartifact login --tool pip ...', and re-run, or re-run with"
+        warn "--pypi to install websockets, aiohttp and zeroconf from public PyPI."
+    else
+        info "Check the internet connection, or re-run with --python <path>"
+        info "pointing at another Python 3."
+    fi
+}
 if venv_current; then
     info "Virtualenv is up to date."
 else
     info "Creating the virtualenv and installing websockets, aiohttp, zeroconf..."
     rm -rf "$VENV"
     "$PYTHON" -m venv "$VENV" || die "could not create a virtualenv with $PYTHON"
-    "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check \
-        -r "$REPO/requirements.txt" ||
-        die "pip install failed (see above). Check the internet connection, or re-run with
-       --python <path> pointing at another Python 3."
+    if ! pip_install; then
+        pip_explain
+        die "pip install failed (see above)."
+    fi
 fi
 rm -rf "$APP_DIR/keylight_mk2"
 mkdir -p "$APP_DIR/keylight_mk2" "$APP_DIR/bin"
