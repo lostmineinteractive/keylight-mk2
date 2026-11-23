@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""elgato: command-line control for the elgato-mk2-bridge daemon.
+"""keylight-mk2: command-line control for the keylight-mk2-bridge daemon.
 
 A thin wrapper over the local HTTP API (standard library only).
 
-  elgato status                      show every light
-  elgato on | off | toggle           switch the light(s)
-  elgato set -b 40 -k 4500           brightness 40%, 4500K (add --on / --off)
-  elgato brightness 40               shorthand for: set -b 40
-  elgato kelvin 4500                 shorthand for: set -k 4500
-  elgato -l key off                  address one light by name or serial
+  keylight-mk2 status                      show every light
+  keylight-mk2 on | off | toggle           switch the light(s)
+  keylight-mk2 set -b 40 -k 4500           brightness 40%, 4500K (add --on / --off)
+  keylight-mk2 brightness 40               shorthand for: set -b 40
+  keylight-mk2 kelvin 4500                 shorthand for: set -k 4500
+  keylight-mk2 -l key off                  address one light by name or serial
 
 Reads the port (and optional secret) from the bridge's config.json; override
-with ELGATO_BRIDGE_URL / ELGATO_BRIDGE_SECRET.
+with KEYLIGHT_BRIDGE_URL / KEYLIGHT_BRIDGE_SECRET.
 """
 
 import argparse
@@ -24,8 +24,8 @@ import urllib.request
 from pathlib import Path
 
 CONFIG = Path(
-    os.environ.get("ELGATO_MK2_BRIDGE_HOME")
-    or Path.home() / "Library" / "Application Support" / "elgato-mk2-bridge"
+    os.environ.get("KEYLIGHT_MK2_BRIDGE_HOME")
+    or Path.home() / "Library" / "Application Support" / "keylight-mk2-bridge"
 ) / "config.json"
 
 
@@ -38,8 +38,8 @@ def endpoint():
     bind = config.get("bind") or "127.0.0.1"
     if bind in ("0.0.0.0", "::"):
         bind = "127.0.0.1"
-    url = os.environ.get("ELGATO_BRIDGE_URL") or f"http://{bind}:{config.get('port', 9124)}"
-    return url.rstrip("/"), os.environ.get("ELGATO_BRIDGE_SECRET") or config.get("secret")
+    url = os.environ.get("KEYLIGHT_BRIDGE_URL") or f"http://{bind}:{config.get('port', 9124)}"
+    return url.rstrip("/"), os.environ.get("KEYLIGHT_BRIDGE_SECRET") or config.get("secret")
 
 
 def request(method, path, body=None):
@@ -61,7 +61,7 @@ def request(method, path, body=None):
             return exc.code, {"ok": False, "error": f"HTTP {exc.code} {exc.reason}"}
     except (urllib.error.URLError, OSError) as exc:
         reason = getattr(exc, "reason", exc)
-        sys.exit(f"elgato: cannot reach the bridge at {base} ({reason}). Is the daemon running?")
+        sys.exit(f"keylight-mk2: cannot reach the bridge at {base} ({reason}). Is the daemon running?")
 
 
 def describe(light):
@@ -80,7 +80,7 @@ def describe(light):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="elgato", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        prog="keylight-mk2", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("-l", "--light", help="name or serial of one light (default: all)")
     parser.add_argument("--json", action="store_true", help="print the raw API response")
@@ -118,7 +118,7 @@ def main():
         for light in reply.get("lights", [reply] if "name" in reply else []):
             print(describe(light))
         if not reply.get("ok"):
-            print(f"elgato: {reply.get('error', f'HTTP {status}')}", file=sys.stderr)
+            print(f"keylight-mk2: {reply.get('error', f'HTTP {status}')}", file=sys.stderr)
     return 0 if reply.get("ok") else 1
 
 

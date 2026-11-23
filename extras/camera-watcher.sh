@@ -1,5 +1,5 @@
 #!/bin/bash
-# Camera auto-trigger for elgato-mk2-bridge (optional, and the most fragile part).
+# Camera auto-trigger for keylight-mk2-bridge (optional, and the most fragile part).
 #
 # Watches for the camera turning on or off and tells the bridge: camera on ->
 # light on with the call preset, camera off -> light off.
@@ -14,7 +14,7 @@
 
 set -u
 
-APP_DIR="${ELGATO_MK2_BRIDGE_HOME:-$HOME/Library/Application Support/elgato-mk2-bridge}"
+APP_DIR="${KEYLIGHT_MK2_BRIDGE_HOME:-$HOME/Library/Application Support/keylight-mk2-bridge}"
 CONF="$APP_DIR/camera-watcher.conf"
 LOG=/usr/bin/log
 
@@ -151,7 +151,7 @@ pause() {
 
 calibrate() {
     local capture on_lines off_lines broad="" i pid mark0 mark1 mark2 starts stops last picked=""
-    capture="$(mktemp -t elgato-camera-calibration)"
+    capture="$(mktemp -t keylight-mk2-camera-calibration)"
     on_lines="$capture.on"
     off_lines="$capture.off"
     for i in "${!CANDIDATES[@]}"; do
@@ -200,7 +200,7 @@ calibrate() {
         echo
         echo "Using '${CANDIDATES[$picked]}'. Saved to $CONF"
         echo "Restart the watcher to apply:"
-        echo "  launchctl kickstart -k gui/$(id -u)/com.user.elgato-mk2-camera"
+        echo "  launchctl kickstart -k gui/$(id -u)/com.lostmineinteractive.keylight-mk2-camera"
     else
         echo
         echo "None of the known signals tracked the camera on this macOS version."

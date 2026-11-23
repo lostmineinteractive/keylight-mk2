@@ -9,10 +9,10 @@
 
 set -euo pipefail
 
-LABEL="com.user.elgato-mk2-camera"
-APP_DIR="$HOME/Library/Application Support/elgato-mk2-bridge"
+LABEL="com.lostmineinteractive.keylight-mk2-camera"
+APP_DIR="$HOME/Library/Application Support/keylight-mk2-bridge"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG_FILE="$HOME/Library/Logs/elgato-mk2-camera.log"
+LOG_FILE="$HOME/Library/Logs/keylight-mk2-camera.log"
 WATCHER="$APP_DIR/bin/camera-watcher.sh"
 CONF="$APP_DIR/camera-watcher.conf"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

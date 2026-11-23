@@ -1,19 +1,19 @@
 #!/bin/bash
-# Installer for elgato-mk2-bridge. Idempotent: safe to re-run.
+# Installer for keylight-mk2-bridge. Idempotent: safe to re-run.
 #
 # Mints a client certificate from the PKI inside Elgato Control Center, installs
-# the daemon into ~/Library/Application Support/elgato-mk2-bridge, discovers the
+# the daemon into ~/Library/Application Support/keylight-mk2-bridge, discovers the
 # light, starts the daemon under launchd, and cycles the light as a smoke test.
 
 set -euo pipefail
 
-LABEL="com.user.elgato-mk2-bridge"
-APP_DIR="$HOME/Library/Application Support/elgato-mk2-bridge"
+LABEL="com.lostmineinteractive.keylight-mk2-bridge"
+APP_DIR="$HOME/Library/Application Support/keylight-mk2-bridge"
 CERTS="$APP_DIR/certs"
 VENV="$APP_DIR/venv"
 CONFIG="$APP_DIR/config.json"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG_FILE="$HOME/Library/Logs/elgato-mk2-bridge.log"
+LOG_FILE="$HOME/Library/Logs/keylight-mk2-bridge.log"
 PKI_NAME="pki_Key_Light_Air_Mk2"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -74,7 +74,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/elgato-mk2-bridge.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/keylight-mk2-bridge.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 confirm() {
@@ -343,8 +343,8 @@ fi
 rm -rf "$APP_DIR/bridge"
 mkdir -p "$APP_DIR/bridge" "$APP_DIR/bin"
 cp "$REPO"/bridge/*.py "$APP_DIR/bridge/"
-install -m 755 "$REPO/cli/elgato" "$APP_DIR/bin/elgato"
-info "Installed the daemon and the 'elgato' CLI."
+install -m 755 "$REPO/cli/keylight-mk2" "$APP_DIR/bin/keylight-mk2"
+info "Installed the daemon and the 'keylight-mk2' CLI."
 
 # ------------------------------------------------------------- 6. config.json
 
@@ -527,8 +527,8 @@ Installed. The bridge is listening on $BASE_URL
   curl -s -X POST $BASE_URL/toggle
   curl -s -X POST $BASE_URL/set -d '{"on":1,"brightness":40,"kelvin":4500}'
 
-Command line:  "$APP_DIR/bin/elgato" status
-               (to put it on your PATH: ln -s "$APP_DIR/bin/elgato" /usr/local/bin/elgato)
+Command line:  "$APP_DIR/bin/keylight-mk2" status
+               (to put it on your PATH: ln -s "$APP_DIR/bin/keylight-mk2" /usr/local/bin/keylight-mk2)
 Shortcuts:     see shortcuts/README.md
 Camera auto on/off (optional): see extras/README.md
 Full API reference and troubleshooting: README.md

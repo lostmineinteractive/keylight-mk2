@@ -20,7 +20,7 @@ The bridge must already be installed (`../install.sh`).
 ```
 
 Then start a video preview (Photo Booth, FaceTime) and watch the light. Activity
-is logged to `~/Library/Logs/elgato-mk2-camera.log`.
+is logged to `~/Library/Logs/keylight-mk2-camera.log`.
 
 ## Approach A: the unified log (default, no compiler)
 
@@ -43,7 +43,7 @@ treat the default as a starting point rather than a guarantee.
 If the light does not react, find out what *your* macOS logs:
 
 ```sh
-"$HOME/Library/Application Support/elgato-mk2-bridge/bin/camera-watcher.sh" calibrate
+"$HOME/Library/Application Support/keylight-mk2-bridge/bin/camera-watcher.sh" calibrate
 ```
 
 It records the candidate log lines while you turn the camera on and then off,
@@ -76,7 +76,7 @@ Re-run without `--swift` to go back to the log watcher.
 
 ## Settings
 
-`~/Library/Application Support/elgato-mk2-bridge/camera-watcher.conf`, changed
+`~/Library/Application Support/keylight-mk2-bridge/camera-watcher.conf`, changed
 with `camera-watcher.sh set KEY VALUE` (then restart the watcher):
 
 | Key | Default | Meaning |
@@ -88,7 +88,7 @@ with `camera-watcher.sh set KEY VALUE` (then restart the watcher):
 | `BRIDGE_URL`, `BRIDGE_SECRET` | from the bridge's config | Where the bridge is. |
 
 ```sh
-launchctl kickstart -k gui/$(id -u)/com.user.elgato-mk2-camera   # restart the watcher
+launchctl kickstart -k gui/$(id -u)/com.lostmineinteractive.keylight-mk2-camera   # restart the watcher
 camera-watcher.sh test                                          # fire on, then off, without the camera
 ```
 

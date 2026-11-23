@@ -82,7 +82,7 @@ an app opens or closes, for example *Light: Call preset* when Zoom opens. For
 bridge that only listens on the Mac's localhost. To allow it, the bridge has to
 listen on the Mac's LAN address:
 
-1. Edit `~/Library/Application Support/elgato-mk2-bridge/config.json`:
+1. Edit `~/Library/Application Support/keylight-mk2-bridge/config.json`:
 
    ```json
    {
@@ -94,7 +94,7 @@ listen on the Mac's LAN address:
    ```
 
 2. Restart the daemon:
-   `launchctl kickstart -k gui/$(id -u)/com.user.elgato-mk2-bridge`
+   `launchctl kickstart -k gui/$(id -u)/com.lostmineinteractive.keylight-mk2-bridge`
 3. In the iOS shortcut, use the Mac's address (for example
    `http://my-mac.local:9124/on`) and, under **Headers**, add
    `X-Bridge-Secret` with the same secret.
@@ -108,5 +108,5 @@ and never forward the port to the internet. macOS may also ask whether to allow
 incoming connections for Python; allow it.
 
 When a secret is set, Shortcuts on the Mac must send the `X-Bridge-Secret`
-header too. The `elgato` command-line tool and the camera trigger read it from
+header too. The `keylight-mk2` command-line tool and the camera trigger read it from
 the config automatically.

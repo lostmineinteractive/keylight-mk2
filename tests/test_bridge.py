@@ -2,7 +2,7 @@
 
 Run with the bridge's virtualenv (it has websockets and aiohttp):
 
-    "$HOME/Library/Application Support/elgato-mk2-bridge/venv/bin/python" -m unittest discover tests
+    "$HOME/Library/Application Support/keylight-mk2-bridge/venv/bin/python" -m unittest discover tests
 """
 
 from __future__ import annotations
