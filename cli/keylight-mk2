@@ -9,6 +9,7 @@ A thin wrapper over the local HTTP API (standard library only).
   keylight-mk2 brightness 40               shorthand for: set -b 40
   keylight-mk2 kelvin 4500                 shorthand for: set -k 4500
   keylight-mk2 -l key off                  address one light by name or serial
+  keylight-mk2 update                      pull the source checkout and reinstall
 
 Reads the port (and optional secret) from the bridge's config.json; override
 with KEYLIGHT_MK2_URL / KEYLIGHT_MK2_SECRET.
@@ -17,7 +18,9 @@ with KEYLIGHT_MK2_URL / KEYLIGHT_MK2_SECRET.
 import argparse
 import json
 import os
+import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +30,12 @@ CONFIG = Path(
     os.environ.get("KEYLIGHT_MK2_HOME")
     or Path.home() / "Library" / "Application Support" / "keylight-mk2"
 ) / "config.json"
+INSTALL_INFO = CONFIG.parent / "install.json"
+CAMERA_PLIST = Path.home() / "Library" / "LaunchAgents" / "com.lostmineinteractive.keylight-mk2-camera.plist"
+
+
+class Unreachable(Exception):
+    pass
 
 
 def endpoint():
@@ -42,8 +51,15 @@ def endpoint():
     return url.rstrip("/"), os.environ.get("KEYLIGHT_MK2_SECRET") or config.get("secret")
 
 
-def request(method, path, body=None):
-    """Call the API. Returns (HTTP status, decoded JSON body)."""
+def request(method, path, body=None, timeout=20):
+    """Call the API. Returns (HTTP status, decoded JSON body); exits if unreachable."""
+    try:
+        return _request(method, path, body, timeout)
+    except Unreachable as exc:
+        sys.exit(f"keylight-mk2: {exc}. Is the daemon running?")
+
+
+def _request(method, path, body, timeout):
     base, secret = endpoint()
     req = urllib.request.Request(base + path, method=method)
     if secret:
@@ -52,7 +68,7 @@ def request(method, path, body=None):
         req.data = json.dumps(body).encode()
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=20) as response:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             return response.status, json.load(response)
     except urllib.error.HTTPError as exc:
         try:
@@ -61,7 +77,7 @@ def request(method, path, body=None):
             return exc.code, {"ok": False, "error": f"HTTP {exc.code} {exc.reason}"}
     except (urllib.error.URLError, OSError) as exc:
         reason = getattr(exc, "reason", exc)
-        sys.exit(f"keylight-mk2: cannot reach the bridge at {base} ({reason}). Is the daemon running?")
+        raise Unreachable(f"cannot reach the bridge at {base} ({reason})") from None
 
 
 def describe(light):
@@ -76,6 +92,68 @@ def describe(light):
     if not light.get("reachable"):
         line += f"  [unreachable: {light.get('error', 'no connection')}]"
     return line
+
+
+def update(repo_arg, force):
+    """Pull the checkout this was installed from and re-run its installer."""
+    sys.stdout.reconfigure(line_buffering=True)  # keep our lines in order with git's and the installer's
+    try:
+        info = json.loads(INSTALL_INFO.read_text())
+    except (OSError, ValueError):
+        info = {}
+    if not (repo_arg or info.get("repo")):
+        sys.exit(
+            "keylight-mk2: this install does not record its source checkout (it predates\n"
+            "'update'). Run ./install.sh from the checkout once, or pass --repo PATH."
+        )
+    repo = Path(repo_arg or info["repo"]).expanduser()
+    if not (repo / "install.sh").is_file() or not (repo / ".git").exists():
+        sys.exit(f"keylight-mk2: {repo} is not a keylight-mk2 git checkout (moved?). Pass --repo PATH.")
+
+    def git(*args, **kwargs):
+        return subprocess.run(["git", "-C", str(repo), *args], **kwargs)
+
+    print(f"Pulling {repo}")
+    if git("pull", "--ff-only").returncode != 0:
+        sys.exit("keylight-mk2: git pull failed (see above); the installed version is unchanged.")
+    head = git("rev-parse", "HEAD", capture_output=True, text=True).stdout.strip()
+    installed = info.get("commit") or ""
+    if head and head == installed and not force:
+        print(f"Already up to date ({head[:7]}).")
+        return 0
+    if installed and head:
+        print(f"Changes since the installed version ({installed[:7]}):")
+        git("--no-pager", "log", "--oneline", "--no-decorate", f"{installed}..{head}", stderr=subprocess.DEVNULL)
+
+    # Repeat the original choices. The light is not cycled; the daemon is checked below.
+    command = [str(repo / "install.sh"), "--no-smoke-test"]
+    if info.get("python"):
+        command += ["--python", info["python"]]
+    if info.get("pypi"):
+        command.append("--pypi")
+    if not CAMERA_PLIST.exists():
+        command.append("--no-camera")  # do not ask again; an installed trigger is refreshed
+    if subprocess.run(command, cwd=repo).returncode != 0:
+        sys.exit("keylight-mk2: the installer failed (see above).")
+
+    print("\nChecking the daemon...")
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            _, reply = _request("GET", "/status", None, timeout=5)
+        except Unreachable as exc:
+            if time.monotonic() > deadline:
+                sys.exit(f"keylight-mk2: updated, but the daemon is not answering: {exc}")
+            time.sleep(1)
+            continue
+        lights = reply.get("lights", [])
+        if all(light.get("reachable") for light in lights) or time.monotonic() > deadline:
+            break
+        time.sleep(1)
+    for light in lights:
+        print(describe(light))
+    print(f"Updated to {head[:7] or 'the latest version'}.")
+    return 0
 
 
 def main():
@@ -97,9 +175,14 @@ def main():
     color.add_argument("-t", "--temperature", type=float, metavar="143-344", help="raw mired")
     commands.add_parser("brightness").add_argument("brightness", type=float)
     commands.add_parser("kelvin").add_argument("kelvin", type=float)
+    update_parser = commands.add_parser("update", help="pull the source checkout and reinstall")
+    update_parser.add_argument("--repo", help="the keylight-mk2 checkout (default: the one installed from)")
+    update_parser.add_argument("--force", action="store_true", help="reinstall even if up to date")
     args = parser.parse_args()
 
     command = args.command or "status"
+    if command == "update":
+        return update(args.repo, args.force)
     prefix = f"/light/{urllib.parse.quote(args.light, safe='')}" if args.light else ""
     if command == "status":
         status, reply = request("GET", f"{prefix}/status")

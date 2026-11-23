@@ -76,6 +76,23 @@ Options:
 | `--no-smoke-test` | Skip the light cycle. |
 | `-y`, `--yes` | Answer yes to prompts (expanding a downloaded zip, the camera trigger). |
 
+### Updating
+
+```sh
+keylight-mk2 update
+```
+
+The installer records which checkout it ran from in
+`~/Library/Application Support/keylight-mk2/install.json`, along with the
+commit and any `--python` / `--pypi` choice. `update` runs `git pull --ff-only`
+there and, if anything changed since the installed commit, re-runs
+`./install.sh` with the same choices (without cycling the light), then checks
+that the daemon answers. Certificates, `config.json` and the camera trigger's
+settings are kept. `--force` reinstalls even when up to date; `--repo PATH`
+points at a different checkout. If the pull cannot fast-forward (local
+commits, another branch), nothing is installed and git says why. Installs
+made before `update` existed need one manual `./install.sh` first.
+
 To remove it: `./uninstall.sh` (keeps the minted certificates) or
 `./uninstall.sh --purge` (removes everything).
 
@@ -191,6 +208,7 @@ keylight-mk2 set -b 40 -k 4500 --on
 keylight-mk2 brightness 60
 keylight-mk2 kelvin 3200
 keylight-mk2 -l key off        # one light, by name or serial
+keylight-mk2 update            # pull the checkout and reinstall (see Updating)
 ```
 
 The installer puts it on your `PATH` with a symlink in the first of
