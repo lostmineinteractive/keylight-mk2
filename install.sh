@@ -25,6 +25,7 @@ PYTHON_ARG=""
 PORT_ARG=""
 HOSTS=()
 PYPI=0
+CAMERA=ask
 ASSUME_YES=0
 REMINT=0
 REDISCOVER=0
@@ -41,6 +42,9 @@ Usage: ./install.sh [options]
   --python <path>   Python 3.9+ for the virtualenv (default: Apple's /usr/bin/python3)
   --pypi            Install the Python packages from public PyPI, ignoring any
                     pip config or PIP_* settings that point at another index
+  --camera          Install the camera trigger (light on while the camera is in
+                    use) without asking
+  --no-camera       Skip the camera trigger without asking
   --rediscover      Replace the lights in an existing config.json
   --remint          Mint a fresh client certificate even if one exists
   --no-smoke-test   Skip the on/off/on cycle at the end
@@ -74,6 +78,8 @@ while [ $# -gt 0 ]; do
         --remint) REMINT=1 && shift ;;
         --no-smoke-test) SMOKE=0 && shift ;;
         --pypi) PYPI=1 && shift ;;
+        --camera) CAMERA=yes && shift ;;
+        --no-camera) CAMERA=no && shift ;;
         -y | --yes) ASSUME_YES=1 && shift ;;
         -h | --help) usage && exit 0 ;;
         *) usage >&2 && die "unknown option: $1" ;;
@@ -90,6 +96,16 @@ confirm() {
     read -r -p "    $1 [y/N] " reply
     case "$reply" in [yY]*) return 0 ;; esac
     return 1
+}
+
+# Like confirm, but Return means yes. Without a terminal (and without -y) it is no.
+confirm_default_yes() {
+    [ "$ASSUME_YES" = 1 ] && return 0
+    [ -t 0 ] || return 1
+    local reply
+    read -r -p "    $1 [Y/n] " reply
+    case "$reply" in [nN]*) return 1 ;; esac
+    return 0
 }
 
 # ---------------------------------------------------------------- 1. preflight
@@ -394,6 +410,57 @@ cp "$REPO"/keylight_mk2/*.py "$APP_DIR/keylight_mk2/"
 install -m 755 "$REPO/cli/keylight-mk2" "$APP_DIR/bin/keylight-mk2"
 info "Installed the daemon and the 'keylight-mk2' CLI."
 
+# Put the CLI on the PATH: a symlink in a user-writable directory that is already
+# on it, or else in ~/.local/bin, added to the login shell's profile.
+PATH_MARK="# added by keylight-mk2"
+on_path() { case ":$PATH:" in *":$1:"*) return 0 ;; esac; return 1; }
+link_cli() {
+    local target="$APP_DIR/bin/keylight-mk2" existing dir="" candidate profile=""
+    existing="$(command -v keylight-mk2 || true)"
+    if [ -n "$existing" ]; then
+        if [ "$(readlink "$existing" || true)" = "$target" ]; then
+            info "'keylight-mk2' is on your PATH ($existing)."
+        else
+            warn "'keylight-mk2' on your PATH is $existing, not this install; leaving it."
+            warn "Remove it to use this one."
+        fi
+        return
+    fi
+    for candidate in "$HOME/.local/bin" "$HOME/bin" /usr/local/bin; do
+        if on_path "$candidate" && [ -d "$candidate" ] && [ -w "$candidate" ]; then
+            dir="$candidate" && break
+        fi
+    done
+    if [ -z "$dir" ]; then
+        dir="$HOME/.local/bin"
+        mkdir -p "$dir"
+        case "$(basename "${SHELL:-}")" in
+            zsh) profile="$HOME/.zprofile" ;;
+            bash) profile="$HOME/.bash_profile" ;;
+        esac
+    fi
+    if [ -e "$dir/keylight-mk2" ] || [ -L "$dir/keylight-mk2" ]; then
+        if [ "$(readlink "$dir/keylight-mk2" || true)" != "$target" ]; then
+            warn "$dir/keylight-mk2 already exists and is not this install; leaving it."
+            return
+        fi
+    fi
+    ln -sfn "$target" "$dir/keylight-mk2"
+    if [ -z "$profile" ] && ! on_path "$dir"; then
+        info "Linked $dir/keylight-mk2. Add $dir to your PATH to use it."
+    elif [ -n "$profile" ]; then
+        if ! grep -qF "$PATH_MARK" "$profile" 2>/dev/null; then
+            # shellcheck disable=SC2016 # expanded by the shell that reads the profile
+            printf '\nexport PATH="$HOME/.local/bin:$PATH"  %s\n' "$PATH_MARK" >>"$profile"
+        fi
+        info "Linked $dir/keylight-mk2 and added $dir to your PATH in $profile."
+        info "Open a new terminal window to use 'keylight-mk2'."
+    else
+        info "Linked $dir/keylight-mk2 (on your PATH)."
+    fi
+}
+link_cli
+
 # ------------------------------------------------------------- 6. config.json
 
 # bootout returns before the job is fully gone, and bootstrap fails until it is.
@@ -631,7 +698,30 @@ EOF
     printf '\n\033[32mSmoke test: PASS\033[0m\n'
 fi
 
-# --------------------------------------------------------------- 9. next steps
+# --------------------------------------------------------- 9. camera trigger
+
+CAMERA_LABEL="$LABEL-camera"
+CAMERA_PLIST="$HOME/Library/LaunchAgents/$CAMERA_LABEL.plist"
+if [ "$CAMERA" = ask ] && [ -f "$CAMERA_PLIST" ]; then
+    CAMERA=yes # installed before: refresh it, keeping its settings
+fi
+step "Camera auto on/off"
+if [ "$CAMERA" = ask ]; then
+    info "The light can turn on while any app uses the camera (40%, 4500 K) and"
+    info "off again when the camera stops."
+    if confirm_default_yes "Turn this on?"; then CAMERA=yes; else CAMERA=no; fi
+fi
+if [ "$CAMERA" = yes ]; then
+    "$REPO/extras/install-camera-trigger.sh" 2>&1 | sed 's/^/    /' ||
+        die "the camera trigger did not install (see above); the bridge itself is installed"
+elif [ -f "$CAMERA_PLIST" ]; then
+    info "Left the installed camera trigger as it is (--no-camera). Remove it with"
+    info "./extras/install-camera-trigger.sh --uninstall"
+else
+    info "Skipped. Turn it on later with ./extras/install-camera-trigger.sh"
+fi
+
+# -------------------------------------------------------------- 10. next steps
 
 cat <<EOF
 
@@ -643,9 +733,8 @@ Installed. The bridge is listening on $BASE_URL
   curl -s -X POST $BASE_URL/toggle
   curl -s -X POST $BASE_URL/set -d '{"on":1,"brightness":40,"kelvin":4500}'
 
-Command line:  "$APP_DIR/bin/keylight-mk2" status
-               (to put it on your PATH: ln -s "$APP_DIR/bin/keylight-mk2" /usr/local/bin/keylight-mk2)
+Command line:  keylight-mk2 status    (also on | off | toggle | set; see README.md)
 Shortcuts:     see shortcuts/README.md
-Camera auto on/off (optional): see extras/README.md
+Camera auto on/off: see extras/README.md
 Full API reference and troubleshooting: README.md
 EOF

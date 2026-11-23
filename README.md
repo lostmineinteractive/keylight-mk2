@@ -50,11 +50,16 @@ The installer is idempotent; re-run it any time. It:
    the app lives and whatever it is named.
 2. Mints a client certificate signed by Elgato's intermediate CA into
    `~/Library/Application Support/keylight-mk2/certs/` (mode 600).
-3. Creates a virtualenv there and installs `websockets`, `aiohttp`, `zeroconf`.
+3. Creates a virtualenv there and installs `websockets`, `aiohttp`, `zeroconf`,
+   and puts the `keylight-mk2` command on your `PATH` (see [Command line](#command-line)).
 4. Discovers MK.2 lights over mDNS and writes `config.json`.
 5. Installs a LaunchAgent (`com.lostmineinteractive.keylight-mk2`) so the daemon runs at
    login and restarts if it exits.
 6. Runs a smoke test that cycles the light on, off, on, and prints PASS or FAIL.
+7. Asks whether the light should turn on automatically while the camera is in
+   use (Return means yes) and, if so, installs the
+   [camera trigger](extras/README.md). A re-run keeps an installed trigger up
+   to date without asking.
 
 Options:
 
@@ -65,10 +70,11 @@ Options:
 | `--port <n>` | HTTP port (default 9124). |
 | `--python <path>` | Interpreter for the virtualenv (default: Apple's `/usr/bin/python3`, else `python3` on `PATH`). |
 | `--pypi` | Install the Python packages from public PyPI, ignoring pip config or `PIP_*` settings that point at another index. |
+| `--camera` / `--no-camera` | Install the camera trigger, or skip it, without asking. Without a terminal to ask in (and without `-y`), it is skipped. |
 | `--rediscover` | Replace the lights in an existing `config.json`. |
 | `--remint` | Mint a fresh certificate even if one exists. |
 | `--no-smoke-test` | Skip the light cycle. |
-| `-y`, `--yes` | Answer yes to prompts (expanding a downloaded zip). |
+| `-y`, `--yes` | Answer yes to prompts (expanding a downloaded zip, the camera trigger). |
 
 To remove it: `./uninstall.sh` (keeps the minted certificates) or
 `./uninstall.sh --purge` (removes everything).
@@ -187,17 +193,19 @@ keylight-mk2 kelvin 3200
 keylight-mk2 -l key off        # one light, by name or serial
 ```
 
-To put it on your `PATH`:
-
-```sh
-ln -s "$HOME/Library/Application Support/keylight-mk2/bin/keylight-mk2" /usr/local/bin/keylight-mk2
-```
+The installer puts it on your `PATH` with a symlink in the first of
+`~/.local/bin`, `~/bin` or `/usr/local/bin` that is already on your `PATH` and
+writable. If none is, it creates `~/.local/bin` and adds it to your PATH in
+`~/.zprofile` (zsh) or `~/.bash_profile` (bash), with the line marked
+`# added by keylight-mk2`; open a new terminal window afterwards. It never
+replaces a different `keylight-mk2` already on your `PATH`. `./uninstall.sh`
+removes the symlink and the line.
 
 ## Shortcuts and automation
 
 - [shortcuts/README.md](shortcuts/README.md): wiring macOS and iOS Shortcuts to
   the API, with three ready-to-build shortcuts.
-- [extras/README.md](extras/README.md): optional auto on/off when the camera
+- [extras/README.md](extras/README.md): auto on/off when the camera
   starts and stops.
 
 ## Configuration

@@ -1,10 +1,13 @@
 #!/bin/bash
-# Opt-in: turn the light on when the camera starts and off when it stops.
-# Installs camera-watcher.sh as its own LaunchAgent. Requires the bridge
+# Turn the light on when the camera starts and off when it stops.
+# Installs camera-watcher.sh as its own LaunchAgent (install.sh offers it). Requires the bridge
 # (../install.sh) to be installed first. Safe to re-run.
 #
-#   ./install-camera-trigger.sh             unified-log watcher (no compiler needed)
-#   ./install-camera-trigger.sh --swift     build and use the CoreMediaIO probe instead
+#   ./install-camera-trigger.sh             keep the current backend; on a first install,
+#                                           the CoreMediaIO probe if swiftc can build it,
+#                                           else the unified-log watcher
+#   ./install-camera-trigger.sh --swift     use the CoreMediaIO probe (needs swiftc)
+#   ./install-camera-trigger.sh --log       use the unified-log watcher (no compiler)
 #   ./install-camera-trigger.sh --uninstall remove the camera LaunchAgent
 
 set -euo pipefail
@@ -31,10 +34,11 @@ stop_agent() {
     done
 }
 
-SWIFT=0
+BACKEND=""
 case "${1:-}" in
     "") ;;
-    --swift) SWIFT=1 ;;
+    --swift) BACKEND=probe ;;
+    --log) BACKEND=log ;;
     --uninstall)
         stop_agent
         rm -f "$PLIST" "$WATCHER" "$APP_DIR/bin/camera-probe"
@@ -42,7 +46,7 @@ case "${1:-}" in
         exit 0
         ;;
     *)
-        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
         exit 1
         ;;
 esac
@@ -69,15 +73,28 @@ PY
     chmod 600 "$CONF"
 fi
 
-if [ "$SWIFT" = 1 ]; then
-    command -v swiftc >/dev/null 2>&1 ||
-        die "swiftc not found; install the Xcode command line tools (xcode-select --install)"
+# No flag: keep the backend chosen before, else prefer the probe, which does not
+# depend on log wording that changes between macOS releases.
+requested="$BACKEND"
+[ -n "$BACKEND" ] || BACKEND="$(sed -n 's/^BACKEND=//p' "$CONF" | tail -n 1)"
+[ -n "$BACKEND" ] || BACKEND=probe
+if [ "$BACKEND" = probe ]; then
     echo "Building the CoreMediaIO camera probe..."
-    swiftc -O "$HERE/camera-probe.swift" -o "$APP_DIR/bin/camera-probe"
-    "$WATCHER" set BACKEND probe
-else
-    "$WATCHER" set BACKEND log
+    if command -v swiftc >/dev/null 2>&1 &&
+        swiftc -O "$HERE/camera-probe.swift" -o "$APP_DIR/bin/camera-probe.new" 2>"$CONF.build-log"; then
+        mv "$APP_DIR/bin/camera-probe.new" "$APP_DIR/bin/camera-probe"
+        rm -f "$CONF.build-log"
+    elif [ "$requested" = probe ]; then
+        die "could not build the probe; install the Xcode command line tools
+(xcode-select --install) and re-run. Compiler output: $(cat "$CONF.build-log" 2>/dev/null)"
+    else
+        echo "warning: could not build it (needs the Xcode command line tools); using the" >&2
+        echo "unified-log watcher instead. Re-run with --swift once swiftc works." >&2
+        rm -f "$CONF.build-log" "$APP_DIR/bin/camera-probe.new"
+        BACKEND=log
+    fi
 fi
+"$WATCHER" set BACKEND "$BACKEND"
 
 render() {
     printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/[\\&|]/\\&/g'
@@ -94,13 +111,13 @@ launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null ||
 launchctl enable "$DOMAIN/$LABEL" || true
 
 cat <<EOF
-Camera trigger installed ($([ "$SWIFT" = 1 ] && echo "CoreMediaIO probe" || echo "unified-log watcher")).
+Camera trigger installed ($([ "$BACKEND" = probe ] && echo "CoreMediaIO probe" || echo "unified-log watcher")).
 
   Try it:     start a video preview (Photo Booth, FaceTime) and watch the light
   Log:        $LOG_FILE
   Settings:   $CONF
 EOF
-if [ "$SWIFT" = 0 ]; then
+if [ "$BACKEND" = log ]; then
     cat <<EOF
 
 If the light does not react, the log lines differ on this macOS version. Run
