@@ -40,6 +40,20 @@ for label in "${LABELS[@]}"; do
     fi
 done
 
+# The CLI symlink and PATH line that install.sh added.
+for dir in "$HOME/.local/bin" "$HOME/bin" /usr/local/bin; do
+    if [ "$(readlink "$dir/keylight-mk2" 2>/dev/null || true)" = "$APP_DIR/bin/keylight-mk2" ]; then
+        rm -f "$dir/keylight-mk2"
+        echo "Removed $dir/keylight-mk2"
+    fi
+done
+for profile in "$HOME/.zprofile" "$HOME/.bash_profile"; do
+    if grep -qF "# added by keylight-mk2" "$profile" 2>/dev/null; then
+        sed -i '' '/# added by keylight-mk2$/d' "$profile"
+        echo "Removed the PATH line from $profile"
+    fi
+done
+
 if [ "$PURGE" = 1 ]; then
     rm -rf "$APP_DIR"
     rm -f "${LOGS[@]}"
