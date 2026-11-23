@@ -82,6 +82,13 @@ your local network. Click **Allow**; until you do, the daemon gets `No route to
 host` and the installer waits at the smoke test. The switch lives in **System
 Settings > Privacy & Security > Local Network**.
 
+The terminal app you run the installer from needs the same permission for
+discovery. macOS asks each app only once, so if your terminal (Terminal, iTerm)
+was ever denied, discovery silently finds nothing and no prompt appears. The
+installer detects this and runs that step as the daemon's Python under launchd
+instead, so only Python needs the permission. Switching your terminal on in the
+same settings page works too.
+
 This is why the installer prefers Apple's Python. macOS tracks the permission
 by code signature, and Apple's Python is properly signed, so the permission
 holds. Homebrew's Python is only ad hoc signed: in testing (macOS 27, Homebrew

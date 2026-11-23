@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import errno
 import json
 import os
 import re
+import socket
+import struct
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -20,6 +23,29 @@ from .config import DEFAULT_BIND, DEFAULT_PORT, default_home
 from .light import Light, LightError
 
 EXIT_NOT_FOUND = 3
+EXIT_BLOCKED = 4
+
+# An mDNS query for Elgato lights (PTR _elg._tcp.local), the same one discovery sends.
+_MDNS_QUERY = struct.pack("!6H", 0, 0, 1, 0, 0, 0) + b"\x04_elg\x04_tcp\x05local\x00" + struct.pack("!2H", 12, 1)
+
+
+def local_network_blocked() -> bool:
+    """True when macOS Local Network privacy keeps this process off the LAN.
+
+    A blocked process gets EHOSTUNREACH for anything on the local network,
+    multicast included, while the router stays reachable. zeroconf swallows
+    that error, so without this check a block looks like "no lights found".
+    The permission belongs to the app that started the process: the terminal
+    for a command typed into it, Python itself for a launchd job.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.sendto(_MDNS_QUERY, ("224.0.0.251", 5353))
+    except OSError as exc:
+        return exc.errno == errno.EHOSTUNREACH
+    finally:
+        sock.close()
+    return False
 
 
 async def _probe(host: str, certs: Path) -> Dict[str, Any]:
@@ -90,6 +116,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"  {entry.get('name', '?')}: {entry['host']}")
         _write(args.config, config)
         return 0
+
+    if sys.platform == "darwin" and local_network_blocked():
+        print("error: macOS is keeping this process off the local network", file=sys.stderr)
+        return EXIT_BLOCKED
 
     if args.host:
         hosts = args.host
